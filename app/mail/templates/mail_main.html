@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block head %}
+	<title>Home Page| Marketing Agency</title>
+{% endblock %}
+{% block body %}
+	<div class="container align-items-center">
+		<section class="my-3">
+			<h1 class="display-1">Add Emails</h1>
+			<p class="lead">Add email with password.<p>
+			<p class="lead">To add a email please click in below button and enter the email password and click on check button in form after checking the you can add the email and password, to read future emails list.<p>
+			<div class="mt-5">
+				<button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#AddEmailModel">Add new email</button>
+			</div>
+		</section>
+		<table class="table table-bordered table-striped table-hover my-4">
+			<thead>
+				<tr>
+					<th scope="col">S.no.</th>
+					<th scope="col">Email</th>
+					<th scope="col" class="text-center">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+		{% for user in users %}
+			<tr>
+				<th scope="row">{{ loop.index }}</th>
+				<td>{{ user.email }}</td>
+				<td class="text-center">
+					<button class="btn btn-success" hx-get="{{ url_for('mail.get_mail') }}" data-bs-toggle="modal" data-bs-target="#show-mails" hx-target="#mail-model-body" hx-indicator="#show-mail-indicator" hx-vals='{"user_id": "{{ user.id }}"}'>View Emails</button>
+				</td>
+			</tr>
+		{% endfor %}
+			</tbody>
+		</table>
+	</div>
+	<!-- Model section -->
+	<div class="modal fade" id="AddEmailModel" tabindex="-1" aria-hidden="true">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">Add Email</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<p> Add Email and password and click on check button to see if the email and password are correct.</p>
+					<form class="row" method="POST">
+						<div class="col-8">
+							<label for="email" class="form-label"> Email: </label>
+							<input class="form-control my-2" id="email" name="email" type="email" placeholder="Enter email to be checked" aria-label="Enter email to be checked" required>
+							<label for="password" class="form-label"> Password: </label>
+							<input class="form-control my-2" id="password" name="password" type="text" placeholder="Enter password to be checked" aria-label="Enter email to be checked" required>
+						</div>
+						<div class="col-4">
+							<label for="server" class="form-label mb-1">Choose Server</label>
+							<select name="server" id="server" class="form-select my-2">
+								<option value="gmail" selected>Gamil</option>
+								<option value="outlook">Outlook</option>
+								<option value="t-online">T online</option>
+							</select>
+							<button type="button" class="btn btn-outline-warning mt-5" hx-get="{{ url_for('mail.check_mail') }}" hx-include="#email,#password,#server" hx-target="#mail-check" hx-indicator="#indicator">Check</button>
+						</div>
+						<div id="indicator" class="col-auto htmx-indicator">
+							<div class="spinner-grow text-warning" role="status">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+						</div>
+						<div class="col-auto my-2" id="mail-check">
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- show mails Model section -->
+	<div class="modal modal-xl fade modal-dialog-scrollable" id="show-mails" tabindex="-1" aria-hidden="true">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">See all Emails</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div id="show-mail-indicator" class="col-auto htmx-indicator text-center">
+					<div class="spinner-grow text-primary" role="status">
+						<span class="visually-hidden">Loading...</span>
+					</div>
+				</div>
+				<div class="modal-body" id="mail-model-body">
+				</div>
+			</div>
+		</div>
+	</div>
+{% endblock %}

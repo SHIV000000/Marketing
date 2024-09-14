@@ -1,0 +1,36 @@
+<!-- Marketing\app\templates\navbar.html -->
+
+<nav class="navbar navbar-expand-lg bg-body-tertiary sticky-top">
+	<div class="container">
+	  <a class="navbar-brand" href="{{ url_for('home') }}">Marketing Tracking</a>
+	  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+		<span class="navbar-toggler-icon"></span>
+	  </button>
+	  <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+	  {% set page = request.endpoint|replace("main.","") %}
+	  {% if session.currentAgency %}
+		  <div class="navbar-nav">
+			  <a class="mx-2 nav-link {% if page == "dashboard" %}active{% endif %}" aria-current="{% if page == "dashboard" %}true{% else %}false{% endif %}" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+			  <a class="mx-2 nav-link {% if page == "lex_main" %}active{% endif %}" aria-current="{% if page == "lex_main" %}true{% else %}false{% endif %}" href="{{ url_for('main.lex_main') }}">Lex Office Accounts</a>
+			  <a class="mx-2 nav-link {% if page == "sev_main" %}active{% endif %}" aria-current="{% if page == "sev_main" %}true{% else %}false{% endif %}" href="{{ url_for('main.sev_main') }}">Sevdesk Accounts</a>
+			  <a class="mx-2 nav-link {% if page == "deutsche" %}active{% endif %}" aria-current="{% if page == "deutsche" %}true{% else %}false{% endif %}" href="{{ url_for('deutsche.deutsche_bank') }}">Deutsche</a>
+			  <a class="mx-2 nav-link {% if page == "finapi" %}active{% endif %}" aria-current="{% if page == "finapi" %}true{% else %}false{% endif %}" href="{{ url_for('finapi.main') }}">Bank connections</a>
+			  <a class="mx-2 nav-link {% if page == "manual_entry" %}active{% endif %}" aria-current="{% if page == "manual_entry" %}true{% else %}false{% endif %}" href="{{ url_for('main.manual_entry') }}">Manual</a>
+			  <a class="mx-2 nav-link {% if page == "mail" %}active{% endif %}" aria-current="{% if page == "mail" %}true{% else %}false{% endif %}" href="{{ url_for('mail.main') }}">Mail</a>
+		  </div>
+		  <div class="navbar-nav ms-auto">
+		  {% if session.currentAgency.isAdmin %}
+			  <a class="nav-link mx-2" href="{{ url_for('admin.main') }}">Admin</a>
+		  {% endif %}
+			  <a class="nav-link mx-2" href="{{ url_for('main.logout') }}">Logout</a>
+		  </div>
+		  {% else %}
+		  <div class="navbar-nav ms-auto">
+			  <a class="nav-link mx-2 {% if page == "login" %}active{% endif %}" href="{{ url_for("main.login") }}" aria-current="{% if page == "login" %}true{% else %}false{% endif %}">Login</a>
+			  <a class="nav-link mx-2 {% if page == "register" %}active{% endif %}" href="{{ url_for("main.register") }}" aria-current="{% if page == "register" %}true{% else %}false{% endif %}">Register</a>
+		  </div>
+	  {% endif %}
+	  </div>
+	</div>
+  </nav>
+  

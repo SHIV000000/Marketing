@@ -1,0 +1,32 @@
+{% if not mails %}
+<p class="fs-4"> No Mails found </p>
+{% else %}
+<p class="fs-4">Below is the list of last 30 emails<p>
+{% endif %}
+<div class="accordion accordion-flush" id="accordionExample">
+	{% for mail in mails %}
+	<div class="accordion-item">
+		<h2 class="accordion-header">
+			<button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index0 }}" aria-expanded="false" aria-controls="#collapse{{ loop.index0 }}">
+				{{ mail.subject }}
+			</button>
+		</h2>
+		<div id="collapse{{ loop.index0 }}" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+			<div class="accordion-body">
+				<p>The mail was sent to email: {{ mail.to }}</p>
+				<div class="row">
+					{% for att in mail.attachments %}
+					<a class="col-2 btn btn-outline-primary" target="_blank" href="{{ url_for('mail.get_att', user_id=user_id, mail_id=mail.uid, filename=att.filename) }}">{{ att.filename }}</a>
+					{% endfor %}
+				</div>
+				<p class="fs-3 fw-medium">Body</p>
+				{% if mail.text %}
+				<p>{{ mail.text }}<p>
+				{% elif mail.html %}
+				<iframe srcdoc="{{ mail.html }}" class="w-100"></iframe>
+				{% endif %}
+			</div>
+		</div>
+	</div>
+	{% endfor %}
+</div>
