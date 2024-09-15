@@ -1,0 +1,33 @@
+<!-- app/mail/templates/search_results.html -->
+
+<h3>Search Results</h3>
+<div class="list-group">
+    {% for email in emails %}
+        <a href="#" class="list-group-item list-group-item-action" data-bs-toggle="collapse" data-bs-target="#email-{{ email.id }}">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ email.subject }}</h5>
+                <small>{{ email.date.strftime('%Y-%m-%d %H:%M') }}</small>
+            </div>
+            <p class="mb-1">From: {{ email.sender }}</p>
+        </a>
+        <div class="collapse" id="email-{{ email.id }}">
+            <div class="card card-body">
+                <p>{{ email.content[:200] }}{% if email.content|length > 200 %}...{% endif %}</p>
+                {% if email.attachments %}
+                    <h6>Attachments:</h6>
+                    <ul>
+                        {% for attachment in email.attachments %}
+                            <li>
+                                <a href="{{ url_for('mail.get_att', user_id=user_id, email_id=email.id, filename=attachment.filename) }}">
+                                    {{ attachment.filename }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <p>No emails found matching your search criteria.</p>
+    {% endfor %}
+</div>

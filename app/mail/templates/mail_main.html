@@ -1,0 +1,156 @@
+<!-- app/mail/templates/mail_main.html -->
+
+{% extends "base.html" %}
+{% block head %}
+    <title>Email Management | Marketing Agency</title>
+    <style>
+        .email-actions {
+            display: flex;
+            justify-content: space-between;
+        }
+        .email-actions form {
+            display: inline;
+        }
+    </style>
+{% endblock %}
+{% block body %}
+    <div class="container align-items-center">
+        <section class="my-3">
+            <h1 class="display-4">Email Management</h1>
+            <p class="lead">Manage your email accounts and sync emails.</p>
+            <div class="mt-4">
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#AddEmailModel">
+                    <i class="fas fa-plus"></i> Add New Email
+                </button>
+                <a href="{{ url_for('mail.sync_emails') }}" class="btn btn-primary">
+                    <i class="fas fa-sync"></i> Sync Emails
+                </a>
+                <a href="{{ url_for('mail.search_emails') }}" class="btn btn-info">
+                    <i class="fas fa-search"></i> Search Emails
+                </a>
+            </div>
+        </section>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <table class="table table-bordered table-striped table-hover my-4">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Domain</th>
+                    <th scope="col" class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+                <tr>
+                    <th scope="row">{{ loop.index }}</th>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.domain }}</td>
+                    <td class="text-center email-actions">
+                        <button class="btn btn-sm btn-primary" hx-get="{{ url_for('mail.get_mail') }}" 
+                                data-bs-toggle="modal" data-bs-target="#show-mails" 
+                                hx-target="#mail-model-body" hx-indicator="#show-mail-indicator" 
+                                hx-vals='{"user_id": "{{ user.id }}"}'>
+                            <i class="fas fa-envelope"></i> View Emails
+                        </button>
+                        <form action="{{ url_for('mail.delete_email_account', user_id=user.id) }}" method="POST">
+                            <button type="submit" class="btn btn-sm btn-danger" 
+                                    onclick="return confirm('Are you sure you want to delete this email account?')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add Email Modal -->
+    <div class="modal fade" id="AddEmailModel" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Email Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Add Email and password and click on check button to verify the credentials.</p>
+                    <form class="row g-3" method="POST">
+                        <div class="col-md-8">
+                            <label for="email" class="form-label">Email:</label>
+                            <input class="form-control" id="email" name="email" type="email" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="server" class="form-label">Server:</label>
+                            <select name="server" id="server" class="form-select">
+                                <option value="gmail" selected>Gmail</option>
+                                <option value="outlook">Outlook</option>
+                                <option value="t-online">T-Online</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="password" class="form-label">Password:</label>
+                            <input class="form-control" id="password" name="password" type="password" required>
+                        </div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-warning" 
+                                    hx-get="{{ url_for('mail.check_mail') }}" 
+                                    hx-include="#email,#password,#server" 
+                                    hx-target="#mail-check" 
+                                    hx-indicator="#indicator">
+                                <i class="fas fa-check"></i> Check Credentials
+                            </button>
+                        </div>
+                        <div id="indicator" class="htmx-indicator">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div id="mail-check"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Show Emails Modal -->
+    <div class="modal fade" id="show-mails" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Email List</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div id="show-mail-indicator" class="htmx-indicator text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div class="modal-body" id="mail-model-body">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js"></script>
+    <script>
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRFToken'] = '{{ csrf_token() }}';
+        });
+    </script>
+{% endblock %}

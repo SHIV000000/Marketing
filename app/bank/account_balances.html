@@ -1,0 +1,24 @@
+# Marketing\app\bank\account_balances.html
+
+
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Account Balances for {{ bank_user.email }}</h1>
+<div class="row">
+    {% for account in balances %}
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ account.name }}</h5>
+                <p class="card-text">Balance: {{ "${:,.2f}".format(account.balances.current) }}</p>
+                <p class="card-text">Available: {{ "${:,.2f}".format(account.balances.available) }}</p>
+                <p class="card-text">Type: {{ account.type }}</p>
+                <p class="card-text">Subtype: {{ account.subtype }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<a href="{{ url_for('bank.index') }}" class="btn btn-primary">Back to Accounts</a>
+{% endblock %}

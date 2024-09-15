@@ -1,0 +1,38 @@
+# Marketing\app\bank\transaction_summary.html
+
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Transaction Summary for {{ bank_user.email }}</h1>
+<div class="row">
+    <div class="col-md-6">
+        <h2>Overview</h2>
+        <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Total Income
+                <span class="badge bg-success rounded-pill">{{ "${:,.2f}".format(summary.total_income) }}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Total Expenses
+                <span class="badge bg-danger rounded-pill">{{ "${:,.2f}".format(summary.total_expenses) }}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Net Income
+                <span class="badge bg-primary rounded-pill">{{ "${:,.2f}".format(summary.net_income) }}</span>
+            </li>
+        </ul>
+    </div>
+    <div class="col-md-6">
+        <h2>Category Breakdown</h2>
+        <ul class="list-group">
+            {% for category, total in summary.category_breakdown %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ category or 'Uncategorized' }}
+                <span class="badge bg-primary rounded-pill">{{ "${:,.2f}".format(total) }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+<a href="{{ url_for('bank.index') }}" class="btn btn-primary mt-3">Back to Accounts</a>
+{% endblock %}

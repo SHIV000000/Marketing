@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block head %}
+	<title>Login | Track Leads.</title>
+{% endblock %}
+{% block body %}
+	<div class="container pt-5 mt-5 d-flex justify-content-center align-items-center">
+		<div class="card bg-light bg-gradient p-5">
+			<div class="card-title">
+				<h3 class="justify-content-center fw-bold">Marketing agency register new account</h3>
+			</div>
+			<div class="card-body">
+				<form method="POST">
+					<div class="my-3">
+						<label for="email" class="form-label"> Email </label>
+						<input required type="email" class="form-control" id="email" name="email">
+						{% if errors %}
+						{% if "email" in errors %}
+						<p class="small text-{{errors["email"][1]}}">{{errors["email"][0]}}</p>
+						{% endif %}
+						{% endif %}
+					</div>
+					<div class="my-3">
+						<label for="password" class="form-label"> Password </label>
+						<input required type="PASSWORD" class="form-control" id="password" name="password">
+					</div>
+					<button type="submit" class="px-5 d-block mx-auto btn btn-success">Register</button>
+				</form>
+			</div>
+			<div class="card-footer">
+				Have an account! <a href="{{url_for("main.login")}}" class="link-underline-light">Login.</a>
+			</div>
+		</div>
+	</div>
+{% endblock %}

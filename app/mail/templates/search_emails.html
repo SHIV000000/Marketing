@@ -1,0 +1,47 @@
+<!-- app/mail/templates/search_emails.html -->
+
+{% extends "base.html" %}
+{% block head %}
+    <title>Search Emails | Marketing Agency</title>
+{% endblock %}
+{% block body %}
+    <div class="container">
+        <h1 class="my-4">Search Emails</h1>
+        <form method="POST" action="{{ url_for('mail.search_emails') }}">
+            <div class="mb-3">
+                <label for="user_id" class="form-label">Select Email Account</label>
+                <select class="form-select" id="user_id" name="user_id" required>
+                    {% for user in users %}
+                        <option value="{{ user.id }}">{{ user.email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="search_term" class="form-label">Search Term</label>
+                <input type="text" class="form-control" id="search_term" name="search_term" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        
+        <div id="search-results" class="mt-4">
+            <!-- Search results will be loaded here -->
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch("{{ url_for('mail.search_emails') }}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('search-results').innerHTML = html;
+            });
+        });
+    </script>
+{% endblock %}
