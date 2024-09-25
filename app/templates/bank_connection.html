@@ -1,0 +1,119 @@
+<!-- app/templates/bank_connection.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Connect German Bank Account</h2>
+    <div id="bankList"></div>
+    <div id="connectionForm" style="display: none;">
+        <h3>Connect to <span id="selectedBankName"></span></h3>
+        <form id="bankConnectionForm">
+            <input type="hidden" id="bankId" name="bankId">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Connect Bank</button>
+        </form>
+    </div>
+    <div id="transactionList" class="mt-5">
+        <h3>Recent Transactions</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Purpose</th>
+                    <th>Bank</th>
+                    <th>Account</th>
+                </tr>
+            </thead>
+            <tbody id="transactionTableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetchBanks();
+    fetchTransactions();
+
+    document.getElementById('bankConnectionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        connectBank();
+    });
+});
+
+function fetchBanks() {
+    fetch('/banks')
+        .then(response => response.json())
+        .then(banks => {
+            const bankList = document.getElementById('bankList');
+            banks.forEach(bank => {
+                const button = document.createElement('button');
+                button.textContent = bank.name;
+                button.classList.add('btn', 'btn-outline-primary', 'm-2');
+                button.addEventListener('click', () => showConnectionForm(bank));
+                bankList.appendChild(button);
+            });
+        })
+        .catch(error => console.error('Error fetching banks:', error));
+}
+
+function showConnectionForm(bank) {
+    document.getElementById('selectedBankName').textContent = bank.name;
+    document.getElementById('bankId').value = bank.id;
+    document.getElementById('connectionForm').style.display = 'block';
+}
+
+function connectBank() {
+    const formData = new FormData(document.getElementById('bankConnectionForm'));
+    const credentials = {
+        bankId: formData.get('bankId'),
+        credentials: {
+            username: formData.get('username'),
+            password: formData.get('password')
+        }
+    };
+
+    fetch('/connect_bank', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(credentials)
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        fetchTransactions();
+    })
+    .catch(error => console.error('Error connecting bank:', error));
+}
+
+function fetchTransactions() {
+    fetch('/transactions')
+        .then(response => response.json())
+        .then(transactions => {
+            const tableBody = document.getElementById('transactionTableBody');
+            tableBody.innerHTML = '';
+            transactions.forEach(transaction => {
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = transaction.booking_date;
+                row.insertCell(1).textContent = `€${transaction.amount.toFixed(2)}`;
+                row.insertCell(2).textContent = transaction.purpose;
+                row.insertCell(3).textContent = transaction.bank_name;
+                row.insertCell(4).textContent = transaction.account_name;
+            });
+        })
+        .catch(error => console.error('Error fetching transactions:', error));
+}
+</script>
+{% endblock %}

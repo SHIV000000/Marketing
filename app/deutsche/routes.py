@@ -9,9 +9,11 @@ from urllib import parse
 from app.deutsche import bp
 from app.deutsche.utils import get_access_token
 from flask import request, render_template, redirect, flash, url_for, session, current_app
-from app.models import Agency, BankUser
+from app.models import Agency, BankConnection
 from app.database import db
 from app.utils import login_required
+from app.models import Agency, BankConnection
+from datetime import datetime, timedelta
 
 @bp.route('/', methods=["GET", "POST"])
 @login_required
@@ -75,15 +77,14 @@ def deutsche_auth():
         sessionDeutsche["refreshToken"] = resultData.get("refresh_token")
         session['deutsche'] = sessionDeutsche
         
-        # Save the bank user information
         current_agency = Agency.query.get(session['currentAgency'].get("id"))
-        bank_user = BankUser(
-            email=session['currentAgency'].get("email"),
+        bank_connection = BankConnection(
             agency_id=current_agency.id,
-            agency=current_agency,
-            refresh_token=sessionDeutsche["refreshToken"]
+            finapi_connection_id=sessionDeutsche["accessToken"],
+            bank_name="Deutsche Bank",
+            last_sync=datetime.utcnow()
         )
-        db.session.add(bank_user)
+        db.session.add(bank_connection)
         db.session.commit()
         
         flash("Successfully connected to Deutsche Bank", "success")
@@ -125,3 +126,4 @@ def page_not_found(e):
 @bp.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
+

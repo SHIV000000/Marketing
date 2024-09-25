@@ -1,20 +1,115 @@
 # Marketing\app\routes.py
 
-
-from flask import Blueprint, request, render_template, redirect, flash, url_for, session
-from app.models import Agency, LexAcc, Customer, Manual, BankUser, MailUser, GoogleAdsAccount
+from flask import Blueprint, request, render_template, redirect, flash, url_for, session, jsonify, current_app, Response
+from app.models import Agency, LexAcc, Customer, Manual, BankConnection, BankAccount, BankTransaction, MailUser, GoogleAdsAccount
 from app.database import db
 from app.utils import login_required, admin_required, is_admin, add_invoice, fetch_sev_invoice, subscribe_to_invoice_event, unsubscribe_invoice_event
 from app.google_ads.google_ads_handler import GoogleAdsHandler
 from app.bank_handler import BankHandler
 from app.mail.email_handler import EmailHandler
+from app.helpers.finapi_helper import FinAPIHelper
 from app.data_analysis import perform_analysis
 from app.errors import CustomerAlreadyExist
 import os
+from flask_login import current_user, login_required
 import requests as rq
-from datetime import datetime as dt
+from datetime import datetime, timedelta
+import json
 
 bp = Blueprint('main', __name__, template_folder="templates", static_folder="static")
+
+@bp.route('/banks', methods=['GET'])
+@login_required
+def get_banks():
+    access_token = FinAPIHelper.get_access_token()
+    banks = FinAPIHelper.get_bank_connections(access_token)
+    return jsonify(banks)
+
+@bp.route('/connect_bank', methods=['POST'])
+@login_required
+def connect_bank():
+    data = request.json
+    access_token = FinAPIHelper.get_access_token()
+    
+    try:
+        connection = FinAPIHelper.import_bank_connection(access_token, data['bank_id'], data['credentials'])
+        
+        bank_connection = BankConnection(
+            agency_id=current_user.agency_id,
+            finapi_connection_id=connection['id'],
+            bank_name=connection['bank']['name']
+        )
+        db.session.add(bank_connection)
+        
+        for account in connection['accounts']:
+            bank_account = BankAccount(
+                connection_id=bank_connection.id,
+                finapi_account_id=account['id'],
+                account_name=account['accountName'],
+                iban=account.get('iban')
+            )
+            db.session.add(bank_account)
+        
+        db.session.commit()
+        return jsonify({'message': 'Bank connected successfully'}), 201
+    except Exception as e:
+        current_app.logger.error(f"Error connecting bank: {str(e)}")
+        return jsonify({'error': 'Failed to connect bank'}), 400
+
+@bp.route('/sync_transactions', methods=['POST'])
+@login_required
+def sync_transactions():
+    access_token = FinAPIHelper.get_access_token()
+    
+    bank_connections = BankConnection.query.filter_by(agency_id=current_user.agency_id).all()
+    for connection in bank_connections:
+        accounts = BankAccount.query.filter_by(connection_id=connection.id).all()
+        account_ids = [account.finapi_account_id for account in accounts]
+        
+        from_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+        to_date = datetime.utcnow().strftime('%Y-%m-%d')
+        
+        transactions = FinAPIHelper.get_transactions(access_token, account_ids, from_date, to_date)
+        
+        for transaction in transactions:
+            existing_transaction = BankTransaction.query.filter_by(finapi_transaction_id=transaction['id']).first()
+            if not existing_transaction:
+                new_transaction = BankTransaction(
+                    account_id=BankAccount.query.filter_by(finapi_account_id=transaction['accountId']).first().id,
+                    finapi_transaction_id=transaction['id'],
+                    amount=transaction['amount'],
+                    purpose=transaction.get('purpose'),
+                    booking_date=datetime.strptime(transaction['bookingDate'], '%Y-%m-%d').date(),
+                    value_date=datetime.strptime(transaction['valueDate'], '%Y-%m-%d').date()
+                )
+                db.session.add(new_transaction)
+        
+        connection.last_sync = datetime.utcnow()
+        db.session.commit()
+    
+    return jsonify({'message': 'Transactions synced successfully'}), 200
+
+@bp.route('/transactions', methods=['GET'])
+@login_required
+def get_transactions():
+    start_date = request.args.get('start_date', (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d'))
+    end_date = request.args.get('end_date', datetime.utcnow().strftime('%Y-%m-%d'))
+    
+    transactions = BankTransaction.query.join(BankAccount).join(BankConnection).filter(
+        BankConnection.agency_id == current_user.agency_id,
+        BankTransaction.booking_date >= start_date,
+        BankTransaction.booking_date <= end_date
+    ).all()
+    
+    return jsonify([{
+        'id': t.id,
+        'amount': t.amount,
+        'purpose': t.purpose,
+        'booking_date': t.booking_date.strftime('%Y-%m-%d'),
+        'value_date': t.value_date.strftime('%Y-%m-%d'),
+        'account_name': t.account.account_name,
+        'bank_name': t.account.connection.bank_name
+    } for t in transactions]), 200
 
 @bp.route("/session")
 def check_session():
@@ -59,8 +154,23 @@ def logout():
 @login_required
 def dashboard():
     agency_id = session['currentAgency'].get("id")
-    analysis_results = perform_analysis(agency_id)
-    return render_template("dashboard.html", results=analysis_results)
+    try:
+        analysis_results = perform_analysis(agency_id)
+        lex_data = LexAcc.query.filter_by(agency_id=agency_id).all()
+        manual_data = Manual.query.filter_by(agency_id=agency_id).all()
+        bank_connections = BankConnection.query.filter_by(agency_id=agency_id).all()
+        google_ads_data = GoogleAdsAccount.query.filter_by(agency_id=agency_id).all()
+        
+        return render_template("dashboard.html", 
+                               results=analysis_results,
+                               lex_data=lex_data,
+                               manual_data=manual_data,
+                               bank_connections=bank_connections,
+                               google_ads_data=google_ads_data)
+    except Exception as e:
+        current_app.logger.error(f"Error in dashboard: {str(e)}")
+        flash("An error occurred while loading the dashboard. Please try again.", "error")
+        return redirect(url_for("main.home"))
 
 @bp.route('/sync-data')
 @login_required
@@ -313,7 +423,7 @@ def manual_entry():
             db.session.commit()
             existing_entry = new_entry
         existing_entry.totalAmount += float(form_data["amount"])
-        existing_entry.addedOn = dt.utcnow()
+        existing_entry.addedOn = datetime.utcnow()
         db.session.commit()
         flash("Manual entry added successfully", "success")
 
@@ -323,6 +433,11 @@ def manual_entry():
 @bp.route("/")
 def home():
     return render_template("home.html")
+
+@bp.route('/bank-connection')
+@login_required
+def bank_connection():
+    return render_template('bank_connection.html')
 
 @bp.errorhandler(404)
 def page_not_found(error):
@@ -357,8 +472,6 @@ def internal_server_error(error):
 def forbidden_error(error):
     return render_template('403.html'), 403
 
-# Additional routes for data visualization
-
 @bp.route('/visualize/<int:agency_id>')
 @login_required
 def visualize_data(agency_id):
@@ -370,19 +483,17 @@ def visualize_data(agency_id):
     # Fetch and process data for visualization
     lex_data = LexAcc.query.filter_by(agency_id=agency_id).all()
     manual_data = Manual.query.filter_by(agency_id=agency_id).all()
-    bank_data = BankUser.query.filter_by(agency_id=agency_id).all()
+    bank_connections = BankConnection.query.filter_by(agency_id=agency_id).all()
     
     # Process the data and prepare it for visualization
-    # This is a placeholder - you'd need to implement the actual data processing logic
     visualization_data = {
         'lex': [{'name': lex.name, 'value': sum(customer.totalGrossAmount for customer in lex.customers)} for lex in lex_data],
         'manual': [{'name': entry.name, 'value': entry.totalAmount} for entry in manual_data],
-        'bank': [{'name': user.email, 'value': sum(transaction.amount for transaction in user.transactions)} for user in bank_data]
+        'bank': [{'name': conn.bank_name, 'value': sum(transaction.amount for account in conn.accounts for transaction in account.transactions)} for conn in bank_connections]
     }
     
     return render_template('visualize.html', data=visualization_data)
 
-# Route for exporting data
 @bp.route('/export/<int:agency_id>')
 @login_required
 def export_data(agency_id):
@@ -394,21 +505,16 @@ def export_data(agency_id):
     # Fetch all relevant data
     lex_data = LexAcc.query.filter_by(agency_id=agency_id).all()
     manual_data = Manual.query.filter_by(agency_id=agency_id).all()
-    bank_data = BankUser.query.filter_by(agency_id=agency_id).all()
+    bank_connections = BankConnection.query.filter_by(agency_id=agency_id).all()
     
     # Process and format the data for export
-    # This is a placeholder - you'd need to implement the actual data export logic
     export_data = {
         'lex': [{'name': lex.name, 'orgID': lex.orgID, 'customers': [{'name': c.name, 'gross': c.totalGrossAmount, 'net': c.totalNetAmount} for c in lex.customers]} for lex in lex_data],
         'manual': [{'name': entry.name, 'source': entry.source, 'amount': entry.totalAmount, 'date': entry.addedOn} for entry in manual_data],
-        'bank': [{'email': user.email, 'transactions': [{'amount': t.amount, 'description': t.description, 'date': t.date} for t in user.transactions]} for user in bank_data]
+        'bank': [{'bank_name': conn.bank_name, 'accounts': [{'account_name': acc.account_name, 'transactions': [{'amount': t.amount, 'purpose': t.purpose, 'booking_date': t.booking_date} for t in acc.transactions]} for acc in conn.accounts]} for conn in bank_connections]
     }
     
-    # Generate a CSV or JSON file
-    # For this example, we'll use JSON
-    import json
-    from flask import Response
-    
+    # Generate a JSON file
     response = Response(
         json.dumps(export_data, default=str),
         mimetype='application/json',
@@ -416,3 +522,90 @@ def export_data(agency_id):
     )
     
     return response
+
+@bp.route('/analysis/<int:agency_id>')
+@login_required
+def analysis(agency_id):
+    agency = db.get_or_404(Agency, agency_id)
+    if agency.id != session['currentAgency'].get("id") and not session['currentAgency'].get("isAdmin"):
+        flash("You don't have permission to view this analysis", "danger")
+        return redirect(url_for("main.dashboard"))
+
+    analysis_results = perform_analysis(agency_id)
+    return render_template('analysis.html', results=analysis_results)
+
+@bp.route('/settings')
+@login_required
+def settings():
+    agency_id = session['currentAgency'].get("id")
+    agency = db.get_or_404(Agency, agency_id)
+    return render_template('settings.html', agency=agency)
+
+@bp.route('/update_settings', methods=['POST'])
+@login_required
+def update_settings():
+    agency_id = session['currentAgency'].get("id")
+    agency = db.get_or_404(Agency, agency_id)
+
+    agency.email = request.form.get('email')
+    if request.form.get('password'):
+        agency.set_password(request.form.get('password'))
+
+    db.session.commit()
+    flash("Settings updated successfully", "success")
+    return redirect(url_for('main.settings'))
+
+@bp.route('/google_ads_setup')
+@login_required
+def google_ads_setup():
+    agency_id = session['currentAgency'].get("id")
+    google_ads_account = GoogleAdsAccount.query.filter_by(agency_id=agency_id).first()
+    return render_template('google_ads_setup.html', google_ads_account=google_ads_account)
+
+@bp.route('/update_google_ads', methods=['POST'])
+@login_required
+def update_google_ads():
+    agency_id = session['currentAgency'].get("id")
+    google_ads_account = GoogleAdsAccount.query.filter_by(agency_id=agency_id).first()
+
+    if not google_ads_account:
+        google_ads_account = GoogleAdsAccount(agency_id=agency_id)
+
+    google_ads_account.client_id = request.form.get('client_id')
+    google_ads_account.client_secret = request.form.get('client_secret')
+    google_ads_account.developer_token = request.form.get('developer_token')
+    google_ads_account.refresh_token = request.form.get('refresh_token')
+
+    db.session.add(google_ads_account)
+    db.session.commit()
+
+    flash("Google Ads account updated successfully", "success")
+    return redirect(url_for('main.google_ads_setup'))
+
+@bp.route('/mail_setup')
+@login_required
+def mail_setup():
+    agency_id = session['currentAgency'].get("id")
+    mail_user = MailUser.query.filter_by(agency_id=agency_id).first()
+    return render_template('mail_setup.html', mail_user=mail_user)
+
+@bp.route('/update_mail', methods=['POST'])
+@login_required
+def update_mail():
+    agency_id = session['currentAgency'].get("id")
+    mail_user = MailUser.query.filter_by(agency_id=agency_id).first()
+
+    if not mail_user:
+        mail_user = MailUser(agency_id=agency_id)
+
+    mail_user.email = request.form.get('email')
+    mail_user.password = request.form.get('password')
+    mail_user.imap_server = request.form.get('imap_server')
+    mail_user.imap_port = request.form.get('imap_port')
+
+    db.session.add(mail_user)
+    db.session.commit()
+
+    flash("Mail settings updated successfully", "success")
+    return redirect(url_for('main.mail_setup'))
+

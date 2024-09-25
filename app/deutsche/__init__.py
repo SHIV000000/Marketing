@@ -1,3 +1,5 @@
+# app\deutsche\__init__.py
+
 from flask import Blueprint
 
 
@@ -8,3 +10,4 @@ bp = Blueprint('deutsche',
                )
 
 from app.deutsche.routes import *
+

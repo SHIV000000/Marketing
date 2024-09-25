@@ -1,14 +1,15 @@
 # Marketing\app\models.py
 
+from datetime import datetime
+from typing import List, Optional
+
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlalchemy as sa
+
 from app.database import db
 from app.errors import UserAlreadyExist, UserDoesntExist, CustomerAlreadyExist
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey
-from werkzeug.security import generate_password_hash, check_password_hash
-from typing import List, Optional
-from datetime import datetime
-import sqlalchemy as sa
-import sqlalchemy.orm as so
 
 class Agency(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -20,7 +21,7 @@ class Agency(db.Model):
     manual: Mapped[List["Manual"]] = relationship(
             back_populates="agency", cascade="all, delete-orphan", default_factory=list
             )
-    bank_users: Mapped[List["BankUser"]] = relationship(
+    bank_connections: Mapped[List["BankConnection"]] = relationship(
             back_populates="agency", cascade="all, delete-orphan", default_factory=list
             )
     mail_users: Mapped[List["MailUser"]] = relationship(
@@ -29,7 +30,7 @@ class Agency(db.Model):
     google_ads_accounts: Mapped[List["GoogleAdsAccount"]] = relationship(
             back_populates="agency", cascade="all, delete-orphan", default_factory=list
             )
-
+    
     @staticmethod
     def create_agency(email, password):
         try:
@@ -114,17 +115,28 @@ class Manual(db.Model):
             )
     addedOn: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
-class BankUser(db.Model):
+class BankConnection(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(sa.String(60), unique=True)
-    phone: Mapped[str] = mapped_column(sa.String(15), unique=True)
-    password: Mapped[str]
-    agency_id: Mapped[int] = mapped_column(sa.ForeignKey("agency.id"))
-    agency: Mapped["Agency"] = relationship(back_populates="bank_users")
-    refresh_token: Mapped[Optional[str]] = mapped_column(sa.String(256))
-    webform_id: Mapped[Optional[str]] = mapped_column(sa.String(256))
-    is_connected: Mapped[bool] = mapped_column(default=False)
-    transactions: Mapped[List["BankTransaction"]] = relationship(back_populates="bank_user", cascade="all, delete-orphan", default_factory=list)
+    agency_id: Mapped[int] = mapped_column(ForeignKey("agency.id"), nullable=False)
+    finapi_connection_id: Mapped[int] = mapped_column(nullable=False)
+    bank_name: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    last_sync: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+class BankAccount(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    connection_id: Mapped[int] = mapped_column(ForeignKey("bank_connection.id"), nullable=False)
+    finapi_account_id: Mapped[int] = mapped_column(nullable=False)
+    account_name: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    iban: Mapped[str] = mapped_column(sa.String(34))
+
+class BankTransaction(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("bank_account.id"), nullable=False)
+    finapi_transaction_id: Mapped[int] = mapped_column(nullable=False)
+    amount: Mapped[float] = mapped_column(nullable=False)
+    purpose: Mapped[str] = mapped_column(sa.String(255))
+    booking_date: Mapped[datetime] = mapped_column(nullable=False)
+    value_date: Mapped[datetime] = mapped_column(nullable=False)
 
 
 class MailUser(db.Model):
@@ -168,14 +180,7 @@ class GoogleAdsCampaign(db.Model):
     account_id: Mapped[int] = mapped_column(sa.ForeignKey("google_ads_account.id"))
     account: Mapped["GoogleAdsAccount"] = relationship(back_populates="campaigns")
 
-class BankTransaction(db.Model):
-    id: Mapped[int] = mapped_column(primary_key=True)
-    transaction_id: Mapped[str] = mapped_column(sa.String(100), unique=True)
-    amount: Mapped[float]
-    description: Mapped[str] = mapped_column(sa.String(255))
-    date: Mapped[datetime]
-    bank_user_id: Mapped[int] = mapped_column(sa.ForeignKey("bank_user.id"))
-    bank_user: Mapped["BankUser"] = relationship(back_populates="transactions")
+
 
 class Email(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -197,4 +202,6 @@ class DataAnalysis(db.Model):
     analysis_type: Mapped[str] = mapped_column(sa.String(50))
     result: Mapped[str] = mapped_column(sa.Text)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+
 

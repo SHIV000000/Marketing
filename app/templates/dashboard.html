@@ -2,8 +2,11 @@
 
 {% extends "base.html" %}
 
+{% block title %}Dashboard | Marketing Dashboard{% endblock %}
+
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -11,35 +14,38 @@
     <h1 class="mb-4">Marketing Dashboard</h1>
 
     <div class="row">
+        <!-- LexOffice/Sevdesk Analysis Card -->
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title">LexOffice Analysis</h5>
+                    <h5 class="card-title">LexOffice/Sevdesk Analysis</h5>
                 </div>
                 <div class="card-body">
-                    <p>Total Gross: €{{ "%.2f"|format(results.lex_office.total_gross) }}</p>
-                    <p>Total Net: €{{ "%.2f"|format(results.lex_office.total_net) }}</p>
-                    <p>Customer Count: {{ results.lex_office.customer_count }}</p>
-                    <p>Average Gross per Customer: €{{ "%.2f"|format(results.lex_office.average_gross_per_customer) }}</p>
+                    <p>Total Gross: €{{ "%.2f"|format(results.lex_sev.total_gross) }}</p>
+                    <p>Total Net: €{{ "%.2f"|format(results.lex_sev.total_net) }}</p>
+                    <p>Customer Count: {{ results.lex_sev.customer_count }}</p>
+                    <p>Average per Customer: €{{ "%.2f"|format(results.lex_sev.average_per_customer) }}</p>
                 </div>
             </div>
         </div>
 
+        <!-- Bank Transactions Card -->
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title">Bank Transactions</h5>
                 </div>
                 <div class="card-body">
-                    <p>Total Transactions: {{ results.bank_transactions.total_transactions }}</p>
-                    <p>Total Amount: €{{ "%.2f"|format(results.bank_transactions.total_amount) }}</p>
-                    <p>Average Transaction Amount: €{{ "%.2f"|format(results.bank_transactions.average_transaction_amount) }}</p>
+                    <p>Total Transactions: {{ results.bank.total_transactions }}</p>
+                    <p>Total Amount: €{{ "%.2f"|format(results.bank.total_amount) }}</p>
+                    <p>Average per Transaction: €{{ "%.2f"|format(results.bank.average_per_transaction) }}</p>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="row">
+        <!-- Google Ads Card -->
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
@@ -47,26 +53,49 @@
                 </div>
                 <div class="card-body">
                     <p>Total Budget: €{{ "%.2f"|format(results.google_ads.total_budget) }}</p>
-                    <p>Active Campaigns: {{ results.google_ads.active_campaigns }}</p>
+                    <p>Total Campaigns: {{ results.google_ads.total_campaigns }}</p>
+                    <p>Average Budget per Campaign: €{{ "%.2f"|format(results.google_ads.average_budget_per_campaign) }}</p>
                 </div>
             </div>
         </div>
 
+        <!-- Manual Entries Card -->
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title">Email Analysis</h5>
+                    <h5 class="card-title">Manual Entries</h5>
                 </div>
                 <div class="card-body">
-                    <p>Total Emails (Last Week): {{ results.email_analysis.total_emails_last_week }}</p>
+                    <p>Total Amount: €{{ "%.2f"|format(results.manual.total_amount) }}</p>
+                    <p>Entry Count: {{ results.manual.entry_count }}</p>
+                    <p>Average per Entry: €{{ "%.2f"|format(results.manual.average_per_entry) }}</p>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Overall Comparison Card -->
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Overall Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <p>Total Revenue: €{{ "%.2f"|format(results.comparison.total_revenue) }}</p>
+                    <p>LexOffice/Sevdesk Percentage: {{ "%.2f"|format(results.comparison.lex_sev_percentage) }}%</p>
+                    <p>Manual Entries Percentage: {{ "%.2f"|format(results.comparison.manual_percentage) }}%</p>
+                    <p>Bank Transactions Percentage: {{ "%.2f"|format(results.comparison.bank_percentage) }}%</p>
+                    <p>Google Ads Budget Percentage: {{ "%.2f"|format(results.comparison.google_ads_budget_percentage) }}%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
     <div class="row mt-4">
         <div class="col-md-6">
-            <canvas id="lexOfficeChart"></canvas>
+            <canvas id="revenueSourcesChart"></canvas>
         </div>
         <div class="col-md-6">
             <canvas id="googleAdsChart"></canvas>
@@ -74,13 +103,16 @@
     </div>
 </div>
 
-<span id="lexOfficeGross" style="display: none;">{{ results.lex_office.total_gross }}</span>
-<span id="lexOfficeNet" style="display: none;">{{ results.lex_office.total_net }}</span>
+<!-- Hidden spans for JavaScript data -->
+<span id="lexSevPercentage" style="display: none;">{{ results.comparison.lex_sev_percentage }}</span>
+<span id="manualPercentage" style="display: none;">{{ results.comparison.manual_percentage }}</span>
+<span id="bankPercentage" style="display: none;">{{ results.comparison.bank_percentage }}</span>
 <span id="googleAdsBudget" style="display: none;">{{ results.google_ads.total_budget }}</span>
-<span id="googleAdsActiveCampaigns" style="display: none;">{{ results.google_ads.active_campaigns }}</span>
+<span id="googleAdsCampaigns" style="display: none;">{{ results.google_ads.total_campaigns }}</span>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    {{ super() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

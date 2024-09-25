@@ -1,5 +1,6 @@
 # Marketing/app/__init__.py
 
+import os
 from flask import Flask, render_template, url_for, request
 from flask_mail import Mail
 from dotenv import load_dotenv
@@ -12,7 +13,6 @@ from app.mail import bp as mail_bp
 from app.google_ads.google_ads_routes import bp as google_ads_bp
 from app.bank_transactions import bp as bank_bp
 from app.data_analysis import bp as analysis_bp
-import os
 
 load_dotenv()
 
@@ -25,8 +25,16 @@ def create_app():
     
     app.secret_key = os.getenv('FLASK_SECRET_KEY')
     
-    if not app.config.get('SQLALCHEMY_DATABASE_URI'):
-        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('FLASK_SQLALCHEMY_DATABASE_URI')
+    # Set the SQLALCHEMY_DATABASE_URI
+    database_uri = os.getenv('FLASK_SQLALCHEMY_DATABASE_URI')
+    if not database_uri:
+        # If the environment variable is not set, use a default SQLite database
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        database_uri = f"sqlite:///{os.path.join(base_dir, 'app.db')}"
+        print(f"Using default SQLite database: {database_uri}")
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     app.config['ADMIN_LIST'] = os.getenv('FLASK_ADMIN_LIST', '').split(',')
 
@@ -38,9 +46,11 @@ def create_app():
     app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
     app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
 
+    # Initialize extensions
     db.init_app(app)
     mail.init_app(app)
 
+    # Register blueprints
     app.register_blueprint(bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(deut_bp, url_prefix="/deutsche")
